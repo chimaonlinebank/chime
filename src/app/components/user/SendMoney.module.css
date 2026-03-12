@@ -1,0 +1,8 @@
+ .sendmoney-svg-progress {
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+.adminchatpanel-messages-area {
+  max-height: 400px;
+}

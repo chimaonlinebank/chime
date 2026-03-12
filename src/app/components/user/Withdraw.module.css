@@ -1,0 +1,16 @@
+.withdraw-spinner {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 9999px;
+  border-width: 8px;
+  border-style: solid;
+  border-color: #00b388;
+  border-top-color: transparent;
+  animation: withdraw-spin 1.2s linear infinite;
+  margin-bottom: 1.5rem;
+}
+
+@keyframes withdraw-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

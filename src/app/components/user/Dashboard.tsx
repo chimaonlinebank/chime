@@ -1,0 +1,906 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
+import { MessageCircle } from 'lucide-react';
+import { motion } from 'motion/react';
+import {
+  Eye,
+  EyeOff,
+  Plus,
+  Send,
+  Receipt,
+  PiggyBank,
+  Sun,
+  Moon,
+  User,
+  TrendingUp,
+  ArrowUpRight,
+  ArrowDownRight,
+  Home,
+  Activity as ActivityIcon,
+  UserCircle,
+  CreditCard,
+  History,
+  X,
+  Banknote,
+  Dice5,
+  Gift,
+  Landmark
+} from 'lucide-react';
+import { Card } from '../ui/card';
+import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import NotificationDropdown from './NotificationDropdown';
+import AccountCreationPrompt from './AccountCreationPrompt';
+import AccountCreationModal from './AccountCreationModal';
+import { OnboardingGuide } from './OnboardingGuide';
+import { useAuthContext } from '../../../context/AuthProvider';
+import { supabaseDbService, type Transaction } from '../../../services/supabaseDbService';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import './Dashboard.css';
+import { formatCurrency } from '../ui/utils';
+
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const { logout, user, updateUser } = useAuthContext();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showAccountCreationPrompt, setShowAccountCreationPrompt] = useState(false);
+  const [showAccountCreationModal, setShowAccountCreationModal] = useState(false);
+  
+  const [balanceVisible, setBalanceVisible] = useState(true);
+  const [balance, setBalance] = useState(0);
+  const [currentView, setCurrentView] = useState('home');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [chatMessageCount, setChatMessageCount] = useState(0);
+  const [userAccounts, setUserAccounts] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [spendingChartData, setSpendingChartData] = useState<{ name: string; amount: number }[]>([]);
+  const [darkMode, setDarkMode] = useState(false);
+  const [spendingThisWeek, setSpendingThisWeek] = useState(0);
+  const [spendingLastWeek, setSpendingLastWeek] = useState(0);
+  const [incomeThisWeek, setIncomeThisWeek] = useState(0);
+  const [expensesThisWeek, setExpensesThisWeek] = useState(0);
+
+  useEffect(() => {
+    if (user?.role === 'user' && user.status === 'UNREGISTERED') {
+      setShowAccountCreationPrompt(true);
+      setShowAccountCreationModal(false);
+      return;
+    }
+    if (user?.role === 'user') {
+      setShowAccountCreationPrompt(false);
+      setShowAccountCreationModal(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const loadProfilePrefs = async () => {
+      if (!user?.id) return;
+      const profile = await supabaseDbService.getProfile(user.id);
+      if (profile?.preferences?.darkMode !== undefined) {
+        setDarkMode(!!profile.preferences.darkMode);
+      }
+      if (profile?.preferences?.onboardingSeen !== true) {
+        setShowOnboarding(true);
+      }
+      if (profile) {
+        updateUser({
+          name: profile.name || user.name,
+          avatar: profile.avatar_url || user.avatar,
+          currency: profile.currency || user.currency,
+          status: (profile.status as any) || user.status
+        });
+      }
+    };
+    loadProfilePrefs();
+  }, [user?.id]);
+
+  // Handle "Create Account" button click on the prompt
+  const handleStartAccountCreation = () => {
+    setShowAccountCreationPrompt(false);
+    setShowAccountCreationModal(true);
+  };
+  useEffect(() => {
+    if (user?.id) {
+      supabaseDbService.getAccounts(user.id).then(setUserAccounts);
+    }
+  }, [user?.id, user?.status]);
+
+  useEffect(() => {
+    const loadTransactions = async () => {
+      if (!user?.id || user.status !== 'ACTIVE') {
+        setTransactions([]);
+        return;
+      }
+      const items = await supabaseDbService.getTransactions(user.id, 200);
+      const sorted = [...items].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setTransactions(sorted);
+    };
+    loadTransactions();
+  }, [user?.id, user?.status]);
+
+  useEffect(() => {
+    const updateCounts = async () => {
+      if (!user?.id) return;
+      const unread = await supabaseDbService.getUnreadUserChatCount(user.id);
+      setChatMessageCount(unread);
+    };
+
+    updateCounts();
+    const interval = setInterval(updateCounts, 4000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [user?.id]);
+
+  const handleHandleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    if (user?.id) {
+      supabaseDbService.updateProfile(user.id, {
+        preferences: { ...(user as any)?.preferences, onboardingSeen: true }
+      });
+    }
+  };
+
+  // Mark all chat messages as read and navigate to chat
+  const handleNavigateToChat = () => {
+    // Navigate to chat
+    navigate('/chat', { state: { from: '/dashboard' } });
+  };
+
+  // Toggle dark mode (only for dashboard)
+  const handleToggleDarkMode = async () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    if (user?.id) {
+      await supabaseDbService.updateProfile(user.id, {
+        preferences: { ...(user as any)?.preferences, darkMode: newDarkMode }
+      });
+    }
+  };
+
+  // Fetch real account balance from database
+  useEffect(() => {
+    if (!user?.id) return;
+    const targetBalance = transactions.reduce((total, tx) => {
+      const amount = Number(tx.amount || 0);
+      return tx.type === 'credit' ? total + amount : total - amount;
+    }, 0);
+
+    let start = 0;
+    const duration = 1000;
+    const increment = targetBalance > 0 ? targetBalance / (duration / 16) : 0;
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= targetBalance) {
+        setBalance(targetBalance);
+        clearInterval(timer);
+      } else {
+        setBalance(start);
+      }
+    }, 16);
+
+    return () => clearInterval(timer);
+  }, [user?.id, transactions]);
+
+  // Calculate spending, income, and chart data from transactions
+  useEffect(() => {
+    if (user?.id) {
+      const now = new Date();
+      const thisWeekStart = new Date(now.getTime() - (now.getDay() * 24 * 60 * 60 * 1000));
+      const lastWeekStart = new Date(thisWeekStart.getTime() - (7 * 24 * 60 * 60 * 1000));
+      const lastWeekEnd = thisWeekStart;
+
+      let thisWeekIncome = 0;
+      let thisWeekExpenses = 0;
+      let lastWeekSpending = 0;
+      const allTransactions: Transaction[] = [...transactions];
+
+      // Weekly calculations
+      allTransactions.forEach((tx) => {
+        const txDate = new Date(tx.created_at || 0);
+        if (txDate >= thisWeekStart) {
+          if (tx.type === 'credit' || Number(tx.amount) > 0) {
+            thisWeekIncome += Math.abs(tx.amount || 0);
+          } else {
+            thisWeekExpenses += Math.abs(tx.amount || 0);
+          }
+        } else if (txDate >= lastWeekStart && txDate < lastWeekEnd) {
+          if (tx.type === 'debit' || Number(tx.amount) < 0) {
+            lastWeekSpending += Math.abs(tx.amount || 0);
+          }
+        }
+      });
+
+      setSpendingThisWeek(thisWeekExpenses);
+      setSpendingLastWeek(lastWeekSpending);
+      setIncomeThisWeek(thisWeekIncome);
+      setExpensesThisWeek(thisWeekExpenses);
+
+      // Spending chart (last 7 days, debit only)
+      const dayBuckets: { key: string; name: string; amount: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        const name = d.toLocaleDateString('en-US', { weekday: 'short' });
+        dayBuckets.push({ key, name, amount: 0 });
+      }
+
+      allTransactions.forEach((tx) => {
+        const txDate = new Date(tx.created_at || 0);
+        const key = txDate.toISOString().slice(0, 10);
+        const bucket = dayBuckets.find(b => b.key === key);
+        if (!bucket) return;
+        if (tx.type === 'debit' || Number(tx.amount) < 0) {
+          bucket.amount += Math.abs(tx.amount || 0);
+        }
+      });
+
+      setSpendingChartData(dayBuckets.map(({ name, amount }) => ({ name, amount })));
+    } else {
+      setTransactions([]);
+      setSpendingChartData([]);
+    }
+  }, [user?.id, user?.status, transactions]);
+
+  const renderContent = () => {
+    if (currentView === 'home') {
+      return (
+        <div className="px-6 pb-24 space-y-6">
+          {/* Balance Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            data-tour="balance"
+          >
+            <Card className="p-6 bg-gradient-to-br from-[#00b388] via-[#00a99d] to-[#008b77] border-0 shadow-xl shadow-[#00b388]/30 overflow-hidden relative">
+              {/* Background pattern */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full blur-2xl" />
+              </div>
+              <div className="relative z-10">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <p className="text-white/80 text-sm mb-1">Available Balance {userAccounts.length > 0 ? `(${userAccounts[0]?.account_number})` : ''}</p>
+                  <div className="flex items-center gap-3">
+                    {balanceVisible ? (
+                      <motion.h2
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-4xl text-white tracking-tight font-semibold tabular-nums"
+                      >
+                        {formatCurrency(balance, user?.currency || 'USD')}
+                      </motion.h2>
+                    ) : (
+                      <h2 className="text-4xl text-white tracking-tight font-semibold">
+                        ••••••
+                      </h2>
+                    )}
+                    <button
+                      onClick={() => setBalanceVisible(!balanceVisible)}
+                      title={balanceVisible ? 'Hide balance' : 'Show balance'}
+                      className="text-white/80 hover:text-white transition-colors"
+                    >
+                      {balanceVisible ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowHistoryModal(true)}
+                    title="View transaction history"
+                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors shadow-md hover:shadow-lg"
+                  >
+                    <History className="w-5 h-5 text-white" />
+                  </button>
+                  <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+              </div>
+
+                <div className="flex items-center gap-2 text-white/90 text-sm">
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>+12.5% this month</span>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Quick Actions */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            data-tour="quick-actions"
+          >
+            <h3 className="text-sm mb-4 text-muted-foreground font-medium">Quick Actions</h3>
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { icon: Plus, label: 'Add', color: '#00b388', bgColor: '#e6f9f4', path: '/add-money', soon: false },
+                { icon: Send, label: 'Send', color: '#6366f1', bgColor: '#eef2ff', path: '/send-money', soon: false },
+                { icon: CreditCard, label: 'Cards', color: '#ec4899', bgColor: '#fce7f3', path: '/dashboard/cards', soon: false },
+                { icon: PiggyBank, label: 'Save', color: '#00a99d', bgColor: '#d4f5f1', path: '/savings', soon: false },
+                { icon: Banknote, label: 'Pay Bills', color: '#f59e0b', bgColor: '#fef3c7', path: null, soon: true },
+                { icon: Dice5, label: 'Betting', color: '#ec4899', bgColor: '#fce7f3', path: null, soon: true },
+                { icon: Gift, label: 'Cashback', color: '#10b981', bgColor: '#d1fae5', path: null, soon: true },
+                { icon: Landmark, label: 'Loan', color: '#8b5cf6', bgColor: '#ede9fe', path: null, soon: true }
+              ].map((action, index) => (
+                <motion.button
+                  key={action.label}
+                  onClick={() => action.path && navigate(action.path)}
+                  disabled={action.soon}
+                  whileHover={{ scale: action.soon ? 1 : 1.05, y: action.soon ? 0 : -2 }}
+                  whileTap={{ scale: action.soon ? 1 : 0.95 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 + index * 0.05 }}
+                  className={`relative flex flex-col items-center gap-2 p-4 rounded-xl bg-card border shadow-md transition-all ${
+                    action.soon 
+                      ? 'border-border opacity-60 cursor-not-allowed' 
+                      : 'border-border hover:border-[#00b388]/20 hover:shadow-lg'
+                  }`}
+                >
+                  {/* SOON Badge */}
+                  {action.soon && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.1 + index * 0.05 + 0.2 }}
+                      className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-400 to-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg"
+                    >
+                      SOON
+                    </motion.div>
+                  )}
+                  
+                  <motion.div
+                    whileHover={action.soon ? {} : { rotate: 5, scale: 1.1 }}
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: index * 0.2 }}
+                    style={{ backgroundColor: action.bgColor }}
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                  >
+                    <motion.div animate={action.soon ? {} : { rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}>
+                      <action.icon className="w-5 h-5" style={{ color: action.color }} />
+                    </motion.div>
+                  </motion.div>
+                  <span className="text-xs font-medium">{action.label}</span>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Pending Transactions */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+          >
+            {(() => {
+              const pendingTx = transactions.filter((tx) => tx.status === 'pending');
+              if (pendingTx.length === 0) return null;
+
+              return (
+                <div className="mb-6">
+                  <h3 className="text-sm mb-4 text-muted-foreground font-medium">Pending Transactions</h3>
+                  <div className="space-y-3">
+                    {pendingTx.slice(0, 3).map((tx) => (
+                      <Card
+                        key={tx.id}
+                        className="p-4 border-l-4 border-l-[#00b388] hover:shadow-md hover:bg-[#f0fdf4] transition-all cursor-pointer"
+                        onClick={() => navigate('/activity')}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-[#e6f9f4] flex items-center justify-center">
+                                {tx.type === 'credit' ? <Plus className="w-5 h-5 text-[#00b388]" /> : <Send className="w-5 h-5 text-[#00b388]" />}
+                              </div>
+                              <div>
+                                <p className="font-medium capitalize">{tx.type === 'credit' ? 'Add Money' : 'Send Money'} - Pending</p>
+                                <p className="text-xs text-muted-foreground">{tx.description}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-[#00b388]">{formatCurrency(Math.abs(Number(tx.amount)), tx.currency || user?.currency || 'USD')}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{tx.type === 'credit' ? 'funding' : 'transfer'}</p>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </motion.div>
+
+          {/* Insights */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h3 className="text-sm mb-4 text-muted-foreground font-medium">Spending Insights</h3>
+            <Card className="p-6 bg-gradient-to-br from-card to-card/50 border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">This Week</p>
+                  <motion.p 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-3xl mt-2 font-bold bg-gradient-to-r from-[#00b388] to-[#00a99d] bg-clip-text text-transparent"
+                  >
+                    ${spendingThisWeek.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  </motion.p>
+                </div>
+                <motion.div 
+                  animate={{ y: [0, -5, 0] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                  className="text-right"
+                >
+                  {spendingLastWeek > 0 ? (
+                    <>
+                      <div className={`flex items-center gap-1 text-sm mb-2 px-3 py-1 rounded-full w-fit ml-auto ${spendingThisWeek < spendingLastWeek ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                        {spendingThisWeek < spendingLastWeek ? (
+                          <><ArrowDownRight className="w-4 h-4" /><span className="font-semibold">{Math.round(((spendingLastWeek - spendingThisWeek) / spendingLastWeek) * 100)}% less</span></>
+                        ) : (
+                          <><ArrowUpRight className="w-4 h-4" /><span className="font-semibold">{Math.round(((spendingThisWeek - spendingLastWeek) / spendingLastWeek) * 100)}% more</span></>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">vs last week</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No data from last week</p>
+                  )}
+                </motion.div>
+              </div>
+              
+              <div className="bg-white/50 dark:bg-white/5 rounded-xl p-4 mb-6 border border-border/30" data-tour="spending-chart">
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={spendingChartData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#e5e7eb"
+                      style={{ fontSize: '12px' }}
+                    />
+                    <YAxis 
+                      stroke="#e5e7eb"
+                      style={{ fontSize: '12px' }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="amount"
+                      stroke="#00b388"
+                      strokeWidth={3}
+                      dot={{ fill: '#00b388', r: 5 }}
+                      activeDot={{ r: 7, fill: '#00a99d' }}
+                      isAnimationActive={true}
+                      animationDuration={800}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <motion.div 
+                  whileHover={{ scale: 1.03 }}
+                  className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-50/50 border border-green-200/30 shadow-sm"
+                >
+                  <div className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    Income
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">${incomeThisWeek.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                </motion.div>
+                <motion.div 
+                  whileHover={{ scale: 1.03 }}
+                  className="p-4 rounded-lg bg-gradient-to-br from-red-50 to-red-50/50 border border-red-200/30 shadow-sm"
+                >
+                  <div className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    Expenses
+                  </div>
+                  <p className="text-2xl font-bold text-red-600">${expensesThisWeek.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                </motion.div>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Recent Transactions */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm text-muted-foreground font-medium">Recent Activity</h3>
+              <button
+                onClick={() => setCurrentView('activity')}
+                className="text-sm text-[#00b388] hover:text-[#009670] transition-colors font-medium"
+              >
+                View All
+              </button>
+            </div>
+            <Card className="shadow-md hover:shadow-lg transition-shadow overflow-hidden" data-tour="recent-transactions">
+              {transactions.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground">
+                  <p>Your recent transactions will appear here once your account is active.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {transactions.slice(0, 4).map((tx) => (
+                    <div key={tx.id} className="p-4 flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{tx.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {tx.created_at ? new Date(tx.created_at).toLocaleDateString() : ''} {tx.created_at ? new Date(tx.created_at).toLocaleTimeString() : ''}
+                        </p>
+                      </div>
+                      <div className={`text-sm font-semibold tabular-nums ${tx.type === 'debit' ? 'text-red-600' : 'text-green-600'}`}>
+                        {tx.type === 'debit' ? '-' : '+'}{formatCurrency(Math.abs(Number(tx.amount)), tx.currency || user?.currency || 'USD')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </motion.div>
+        </div>
+      );
+    } else if (currentView === 'activity') {
+      return (
+        <div className="px-6 pb-24 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2 className="text-2xl mb-6 font-semibold">All Transactions</h2>
+            <Card className="divide-y divide-border">
+              {transactions.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground">
+                  <p>No transactions yet.</p>
+                </div>
+              ) : (
+                transactions.map((tx) => (
+                  <div key={tx.id} className="p-4 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{tx.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {tx.created_at ? new Date(tx.created_at).toLocaleDateString() : ''} {tx.created_at ? new Date(tx.created_at).toLocaleTimeString() : ''}
+                      </p>
+                    </div>
+                    <div className={`text-sm font-semibold tabular-nums ${tx.type === 'debit' ? 'text-red-600' : 'text-green-600'}`}>
+                      {tx.type === 'debit' ? '-' : '+'}{formatCurrency(Math.abs(Number(tx.amount)), tx.currency || user?.currency || 'USD')}
+                    </div>
+                  </div>
+                ))
+              )}
+            </Card>
+          </motion.div>
+        </div>
+      );
+    } else if (currentView === 'profile') {
+      return (
+        <div className="px-6 pb-24 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-20 h-20 rounded-full bg-[#e6f9f4] flex items-center justify-center">
+                <User className="w-10 h-10 text-[#00b388]" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold">John Anderson</h2>
+                <p className="text-sm text-muted-foreground">john.anderson@email.com</p>
+              </div>
+            </div>
+
+            <Card className="divide-y divide-border">
+              {[
+                { label: 'Account Settings', icon: User },
+                { label: 'Security', icon: Eye },
+                { label: 'Customer Care', icon: MessageCircle, action: () => navigate('/chat', { state: { from: '/dashboard' } }) },
+                { label: 'Support', icon: Receipt }
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  className="w-full p-4 flex items-center justify-between hover:bg-accent/50 transition-colors"
+                  onClick={() => item.action?.()}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className="w-5 h-5 text-muted-foreground" />
+                    <span className="font-medium">{item.label}</span>
+                  </div>
+                  <ArrowUpRight className="w-5 h-5 text-muted-foreground" />
+                </button>
+              ))}
+            </Card>
+          </motion.div>
+        </div>
+      );
+    }
+  };
+
+  return (
+    <div className={`dashboard-container relative min-h-screen transition-colors ${darkMode ? 'dark' : ''} ${darkMode ? 'text-white' : 'bg-white text-black'}`}>
+      {/* NotificationDropdown removed from under header bar */}
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className={`sticky top-0 z-10 ${darkMode ? 'bg-[#0d1117]/80 border-b border-[#21262d]' : 'bg-background/80 border-b border-border'} backdrop-blur-lg px-6 py-4`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm ${darkMode ? 'text-[#8b949e]' : 'text-muted-foreground'}`}>Good morning,</p>
+            <h1 className={`text-xl font-semibold ${darkMode ? 'text-white' : ''} truncate hidden sm:block`}>
+              {user?.name?.split(' ')[0] || 'User'}
+            </h1>
+            <h1 className={`text-lng font-semibold ${darkMode ? 'text-white' : ''} truncate sm:hidden`}>
+              {user?.name?.split(' ')[0] || 'User'}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3" data-tour="header-icons">
+            {/* Chat Icon */}
+            <motion.button
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.95 }}
+              animate={{ y: [0, -2, 0] }}
+              transition={{ duration: 3, repeat: Infinity }}
+              className="relative w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-md hover:shadow-lg"
+              style={{ backgroundColor: '#e3f2fd' }}
+              title="Customer Care Chat"
+              onClick={handleNavigateToChat}
+            >
+              <MessageCircle className="w-5 h-5" style={{ color: '#2196F3' }} />
+              {chatMessageCount > 0 && (
+                <motion.div 
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+                >
+                  <span className="text-xs text-white font-semibold">{chatMessageCount > 9 ? '9+' : chatMessageCount}</span>
+                </motion.div>
+              )}
+            </motion.button>
+            {/* Notification Bell Icon */}
+            <NotificationDropdown userId={user?.id} />
+            {/* Dark Mode Toggle */}
+            <motion.button
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.95 }}
+              animate={{ y: [0, -2, 0] }}
+              transition={{ duration: 3, repeat: Infinity, delay: 0.3 }}
+              onClick={handleToggleDarkMode}
+              className="relative w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-md hover:shadow-lg"
+              style={{ backgroundColor: darkMode ? '#161b22' : '#fef3c7' }}
+              title="Toggle dark mode"
+            >
+              {darkMode ? (
+                <Moon className="w-5 h-5" style={{ color: '#fbbf24' }} />
+              ) : (
+                <Sun className="w-5 h-5" style={{ color: '#f59e0b' }} />
+              )}
+            </motion.button>
+            {/* Profile Icon */}
+            <motion.button
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.95 }}
+              animate={{ y: [0, -2, 0] }}
+              transition={{ duration: 3, repeat: Infinity, delay: 0.6 }}
+              onClick={() => navigate('/profile')}
+              className="relative transition-transform shadow-md hover:shadow-lg"
+              title="Profile"
+            >
+              <Avatar className="w-10 h-10 border-2 border-[#00b388] hover:border-[#009670]">
+                <AvatarImage 
+                  src={user?.avatar}
+                  alt={user?.name} 
+                />
+                <AvatarFallback className="bg-gradient-to-br from-[#00b388] to-[#00a99d] text-white font-semibold">
+                  {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+            </motion.button>
+            {/* Logout button removed as requested */}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Content */}
+      <div className="pt-6">
+        {renderContent()}
+      </div>
+
+      {/* Bottom Navigation */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className={`fixed bottom-0 left-0 right-0 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-card border-border'} border-t px-6 py-4 md:hidden`}
+      >
+        <div className="flex items-center justify-around">
+          {[
+            { icon: Home, label: 'Home', action: () => setCurrentView('home'), nav: false, color: '#FF6B6B', bgColor: '#ffe0e0' },
+            { icon: ActivityIcon, label: 'Activity', action: () => setCurrentView('activity'), nav: false, color: '#4ECDC4', bgColor: '#e0f7f6' },
+            { icon: PiggyBank, label: 'Savings', action: () => navigate('/savings'), nav: true, color: '#00a99d', bgColor: '#d4f5f1' },
+            { icon: UserCircle, label: 'Profile', action: () => navigate('/profile'), nav: true, color: '#FFB93B', bgColor: '#fff5e6' }
+          ].map((item, index) => (
+            <motion.button
+              key={item.label}
+              onClick={item.action}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              animate={{ y: [0, -2, 0] }}
+              transition={{ duration: 2.5, repeat: Infinity, delay: index * 0.3 }}
+              className="flex flex-col items-center gap-1 transition-colors p-2 rounded-lg shadow-sm hover:shadow-md"
+            >
+              <motion.div
+                style={{ backgroundColor: item.bgColor }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+              >
+                <motion.div whileHover={{ rotate: 10, scale: 1.15 }}>
+                  <item.icon className="w-5 h-5" style={{ color: item.color }} />
+                </motion.div>
+              </motion.div>
+              <span className="text-xs font-medium">{item.label}</span>
+            </motion.button>
+          ))}
+          {/* Cards Navigation Button */}
+          <motion.button
+            onClick={() => navigate('/dashboard/cards')}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            animate={{ y: [0, -2, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, delay: 1.2 }}
+            className="flex flex-col items-center gap-1 transition-colors cursor-pointer p-2 rounded-lg shadow-sm hover:shadow-md"
+          >
+            <motion.div style={{ backgroundColor: '#f8a5d6' }} className="w-10 h-10 rounded-lg flex items-center justify-center">
+              <motion.div whileHover={{ rotate: 10, scale: 1.15 }}>
+                <CreditCard className="w-5 h-5" style={{ color: '#ec4899' }} />
+              </motion.div>
+            </motion.div>
+            <span className="text-xs font-medium">Cards</span>
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* Account Creation Prompt - Show initial prompt card awaiting user to click "Create Account" */}
+      {showAccountCreationPrompt && (
+        <AccountCreationPrompt
+          isOpen={showAccountCreationPrompt}
+          onClose={() => setShowAccountCreationPrompt(false)}
+          onStartCreation={handleStartAccountCreation}
+        />
+      )}
+
+      {/* Account Creation Modal */}
+      <AccountCreationModal
+        isOpen={showAccountCreationModal}
+        onClose={() => setShowAccountCreationModal(false)}
+        onSuccess={() => {
+          setShowAccountCreationModal(false);
+          setShowAccountCreationPrompt(false);
+          // Refresh dashboard data after account creation
+          if (user?.id) {
+            supabaseDbService.getAccounts(user.id).then(setUserAccounts);
+            supabaseDbService.getTransactions(user.id, 200).then((items) => {
+              const sorted = [...items].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+              setTransactions(sorted);
+            });
+          }
+        }}
+      />
+
+      {/* Onboarding Guide - Show after account activation */}
+      <OnboardingGuide 
+        isOpen={showOnboarding} 
+        onComplete={handleOnboardingComplete} 
+        userName={user?.name || 'User'} 
+      />
+
+      {/* Transaction History Modal */}
+      {showHistoryModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowHistoryModal(false)}
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 bg-gradient-to-br from-[#00b388] to-[#00a99d] px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <History className="w-5 h-5 text-white" />
+                <h2 className="text-lg font-semibold text-white">Transaction History</h2>
+              </div>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                title="Close modal"
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="divide-y divide-border">
+                {transactions.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Receipt className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                    <p className="text-muted-foreground text-sm">No transactions yet</p>
+                  </div>
+                ) : (
+                  transactions.map((transaction: any, index: number) => (
+                    <motion.div
+                      key={transaction.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="p-4 flex items-center gap-4 hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-lg flex-shrink-0">
+                        {transaction.type === 'debit' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate font-medium">{transaction.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : ''} {transaction.created_at ? new Date(transaction.created_at).toLocaleTimeString() : ''}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`text-sm font-semibold tabular-nums ${transaction.type === 'debit' ? 'text-foreground' : 'text-green-600'}`}
+                        >
+                          {transaction.type === 'debit' ? '-' : '+'}{formatCurrency(Math.abs(Number(transaction.amount)), transaction.currency || user?.currency || 'USD')}
+                        </p>
+                        <div className="flex items-center gap-1 justify-end mt-1">
+                          <div className="w-2 h-2 rounded-full bg-green-500" />
+                          <span className="text-xs text-muted-foreground">Completed</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-border p-4 bg-muted/50">
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="w-full px-4 py-2 bg-[#00b388] text-white rounded-lg hover:bg-[#009670] transition-colors font-medium text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+
+    </div>
+  );
+}

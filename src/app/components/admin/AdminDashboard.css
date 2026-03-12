@@ -1,0 +1,13 @@
+/* Minimal AdminDashboard.css to satisfy import and provide small helpers */
+/* Avoid layout/style changes — Tailwind handles the majority of styles. */
+
+.metric-icon-bg { display: flex; align-items: center; justify-content: center; }
+.metric-icon { display: inline-block; }
+
+/* Numeric lining for columns */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Small helpers (non-opinionated) */
+.savings-progress { /* width set via inline style or Tailwind */ }
+.action-icon-bg { /* background set via Tailwind or inline */ }
+.action-icon { display: inline-block; }

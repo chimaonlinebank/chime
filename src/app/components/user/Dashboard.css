@@ -1,0 +1,42 @@
+/* Minimal Dashboard.css to satisfy import and provide tiny helpers */
+/* Tailwind handles most styling; keep this minimal to avoid affecting layout. */
+
+.metric-icon-bg { display: flex; align-items: center; justify-content: center; }
+.metric-icon { display: inline-block; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.transaction-merchant { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.transaction-amount { font-variant-numeric: tabular-nums; }
+.action-icon-bg {}
+.action-icon {}
+.savings-progress {}
+
+/* Dark Mode Styles - Charcoal Black/Deep Slate */
+.dashboard-container.dark {
+  background-color: #0d1117;
+  color: #e8eaed;
+}
+
+.dark .bg-card {
+  background-color: #161b22;
+}
+
+.dark .border-border {
+  border-color: #21262d;
+}
+
+.dark .text-foreground {
+  color: #e8eaed;
+}
+
+.dark .text-muted-foreground {
+  color: #8b949e;
+}
+
+.dark .hover\:bg-accent\/50:hover {
+  background-color: rgba(22, 27, 34, 0.5);
+}
+
+.dark .divide-border > * + * {
+  border-color: #21262d;
+}
+

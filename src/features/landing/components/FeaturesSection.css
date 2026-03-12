@@ -1,0 +1,16 @@
+/* Minimal FeaturesSection.css to satisfy import and provide small helpers */
+/* Keep minimal — Tailwind handles primary styling. */
+
+.mb-4 { margin-bottom: 1rem; }
+.p-3 { padding: .75rem; }
+.rounded-xl { border-radius: .75rem; }
+.w-fit { width: fit-content; }
+.transition-colors { transition: color .2s, background-color .2s; }
+.duration-300 { transition-duration: 300ms; }
+
+/* Icon helpers used by FeaturesSection */
+.feature-icon-wrapper { display: inline-flex; align-items: center; justify-content: center; }
+.feature-icon { display: inline-block; }
+
+/* Tabular numbers */
+.tabular-nums { font-variant-numeric: tabular-nums; }

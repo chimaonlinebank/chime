@@ -1,0 +1,210 @@
+/* Cards Page Styles */
+
+.cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.card-wrapper {
+  position: relative;
+}
+
+.virtual-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: white;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: linear-gradient(135deg, #00b388 0%, #00a99d 100%);
+  box-shadow: 0 10px 30px rgba(0, 179, 136, 0.2);
+}
+
+.virtual-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 40px rgba(0, 179, 136, 0.3);
+}
+
+.virtual-card.frozen {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  opacity: 0.6;
+}
+
+.virtual-card.frozen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.card-number-section {
+  margin-bottom: 1.5rem;
+}
+
+.card-number-label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  display: block;
+}
+
+.card-number-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-number {
+  font-family: 'Courier New', monospace;
+  font-size: 1.125rem;
+  letter-spacing: 0.1em;
+  font-weight: 500;
+}
+
+.card-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding-top: 1rem;
+}
+
+.card-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.card-detail-item {
+  text-align: left;
+}
+
+.card-detail-label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.card-detail-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.card-holder-name {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.card-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.card-action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.card-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.freeze-btn {
+  background-color: rgba(255, 193, 7, 0.15);
+  color: #fcc34d;
+}
+
+.freeze-btn:hover:not(:disabled) {
+  background-color: rgba(255, 193, 7, 0.25);
+}
+
+.delete-btn {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.25);
+}
+
+.copy-feedback {
+  color: white;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  animation: fadeInOut 0.5s ease-in-out forwards;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.empty-state-icon {
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto 1rem;
+}
+
+@media (max-width: 768px) {
+  .cards-container {
+    grid-template-columns: 1fr;
+  }
+
+  .card-details-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .card-details-grid > :nth-child(3) {
+    grid-column: span 2;
+  }
+}

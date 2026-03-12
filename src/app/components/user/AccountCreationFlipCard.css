@@ -1,0 +1,20 @@
+.flip-card-container {
+  perspective: 1200px;
+}
+
+.flip-card-inner {
+  transform-style: preserve-3d;
+}
+
+.flip-card-back {
+  transform: rotateY(180deg);
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.account-creation-no-blur {
+  filter: none;
+  backdrop-filter: none;
+}

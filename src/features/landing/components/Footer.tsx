@@ -1,0 +1,136 @@
+import React from 'react';
+import { Mail, Linkedin, Twitter, Github } from 'lucide-react';
+
+interface FooterLink {
+  label: string;
+  href: string;
+}
+
+interface FooterSection {
+  title: string;
+  links: FooterLink[];
+}
+
+const footerSections: FooterSection[] = [
+  {
+    title: 'Product',
+    links: [
+      { label: 'Features', href: '/features' },
+      { label: 'Security', href: '/security' },
+      { label: 'Pricing', href: '/pricing' },
+      { label: 'Mobile App', href: '/app' },
+    ],
+  },
+  {
+    title: 'Company',
+    links: [
+      { label: 'About', href: '/about' },
+      { label: 'Careers', href: '/careers' },
+      { label: 'Press', href: '/press' },
+      { label: 'Blog', href: '/blog' },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Privacy Policy', href: '/privacy' },
+      { label: 'Terms of Service', href: '/terms' },
+      { label: 'Compliance', href: '/compliance' },
+      { label: 'Licenses', href: '/licenses' },
+    ],
+  },
+  {
+    title: 'Support',
+    links: [
+      { label: 'Help Center', href: '/help' },
+      { label: 'Contact Us', href: '/contact' },
+      { label: 'System Status', href: '/status' },
+      { label: 'FAQs', href: '/faqs' },
+    ],
+  },
+];
+
+const socialLinks = [
+  { icon: <Twitter className="w-5 h-5" />, href: 'https://twitter.com', label: 'Twitter' },
+  { icon: <Linkedin className="w-5 h-5" />, href: 'https://linkedin.com', label: 'LinkedIn' },
+  { icon: <Github className="w-5 h-5" />, href: 'https://github.com', label: 'GitHub' },
+  { icon: <Mail className="w-5 h-5" />, href: 'mailto:support@chime.com', label: 'Email' },
+];
+
+export const Footer: React.FC = () => {
+  return (
+    <footer className="bg-[#00b388] text-white py-16 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Main Footer Content */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
+          {/* Brand Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <img
+                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTXoL24HHFZY9sDPlej_aDDojZL8felyKfctw&s"
+                alt="Chime Logo"
+                className="w-8 h-8 rounded object-contain"
+              />
+              <span className="text-xl font-bold">Chime Next</span>
+            </div>
+            <p className="text-white/85 text-sm leading-relaxed">
+              Modern banking for the way you live. Secure, instant, and always on your side.
+            </p>
+          </div>
+
+          {/* Footer Links */}
+          {footerSections.map((section) => (
+            <div key={section.title}>
+              <h3 className="font-semibold text-white mb-4">{section.title}</h3>
+              <ul className="space-y-2">
+                {section.links.map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.href}
+                      className="text-white/80 hover:text-white transition-colors duration-300 text-sm"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-white/20 py-8" />
+
+        {/* Bottom Section */}
+        <div className="flex flex-col md:flex-row justify-between items-center">
+          <p className="text-white/80 text-sm mb-6 md:mb-0">
+            &copy; {new Date().getFullYear()} Chime Banking. All rights reserved.
+          </p>
+
+          {/* Social Links */}
+          <div className="flex gap-4">
+            {socialLinks.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white hover:text-white transition-all duration-300"
+                aria-label={link.label}
+              >
+                {link.icon}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Trust Info */}
+        <div className="mt-8 pt-8 border-t border-white/20 text-center">
+          <p className="text-white/80 text-xs">
+            Deposits are insured by the FDIC up to the maximum of $250,000 per depositor, per insured bank, for each account ownership category. Your accounts are secure and protected.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+};
