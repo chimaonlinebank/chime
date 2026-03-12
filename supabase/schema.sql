@@ -348,3 +348,39 @@ with check (auth.uid() = user_id or public.is_admin());
 create policy "Messages: update own"
 on chat_messages for update
 using (auth.uid() = user_id or public.is_admin());
+-- Add metadata to transactions
+alter table transactions add column if not exists metadata jsonb default '{}'::jsonb;
+
+-- Storage bucket for payment evidence
+insert into storage.buckets (id, name, public)
+values ('payment-evidence', 'payment-evidence', true)
+on conflict (id) do nothing;
+
+-- Storage policies for payment evidence
+create policy "Evidence: read own"
+on storage.objects for select
+using (
+  bucket_id = 'payment-evidence'
+  and (auth.uid() = owner or public.is_admin())
+);
+
+create policy "Evidence: insert own"
+on storage.objects for insert
+with check (
+  bucket_id = 'payment-evidence'
+  and auth.uid() = owner
+);
+
+create policy "Evidence: update own"
+on storage.objects for update
+using (
+  bucket_id = 'payment-evidence'
+  and (auth.uid() = owner or public.is_admin())
+);
+
+create policy "Evidence: delete own"
+on storage.objects for delete
+using (
+  bucket_id = 'payment-evidence'
+  and (auth.uid() = owner or public.is_admin())
+);

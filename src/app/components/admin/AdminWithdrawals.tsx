@@ -23,6 +23,7 @@ interface WithdrawalRow {
   bankName: string;
   accountNumber: string;
   currency: string;
+  evidenceUrl?: string | null;
 }
 
 export default function AdminWithdrawals() {
@@ -56,6 +57,8 @@ export default function AdminWithdrawals() {
         .map((tx) => {
           const profile = profileById.get(tx.user_id) as Profile | undefined;
           const account = accountById.get(tx.account_id) as Account | undefined;
+          const metadata = tx.metadata || {};
+          const bankDetails = metadata.bank_details || null;
           const userName = profile?.name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'User';
           const currency = tx.currency || profile?.currency || account?.currency || 'USD';
           const amountValue = Number(tx.amount || 0);
@@ -74,10 +77,13 @@ export default function AdminWithdrawals() {
             status: tx.status,
             created: tx.created_at ? new Date(tx.created_at).toLocaleDateString() : 'N/A',
             reference: tx.id,
-            destination: 'External Bank',
-            bankName: 'N/A',
-            accountNumber: account?.account_number ? `****${account.account_number.slice(-4)}` : 'N/A',
+            destination: bankDetails ? 'External Bank' : 'External Bank',
+            bankName: bankDetails?.bankName || 'N/A',
+            accountNumber: bankDetails?.accountNumber
+              ? `****${bankDetails.accountNumber.slice(-4)}`
+              : (account?.account_number ? `****${account.account_number.slice(-4)}` : 'N/A'),
             currency,
+            evidenceUrl: tx.metadata?.evidence_url || null,
           } as WithdrawalRow;
         });
 
@@ -405,10 +411,28 @@ export default function AdminWithdrawals() {
                 <div>
                   <h3 className="text-lg font-bold mb-4">Withdrawal Evidence</h3>
                   <div className="border-2 border-dashed border-border rounded-lg p-4 bg-gray-50/50">
-                    <div className="text-center py-8">
-                      <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No document provided</p>
-                    </div>
+                    {selected.evidenceUrl ? (
+                      <div className="space-y-2">
+                        <img
+                          src={selected.evidenceUrl}
+                          alt="Withdrawal evidence"
+                          className="w-full rounded-lg border border-border max-h-96 object-contain"
+                        />
+                        <a
+                          href={selected.evidenceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-muted-foreground text-center block underline"
+                        >
+                          View full evidence
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">No document provided</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -9,9 +9,12 @@ import {
   ReviewStep,
   StatusStep,
 } from './components';
-import { withdrawService } from './services/withdrawService';
 import { WithdrawAmountInput, BankDetailsInput } from './validation';
 import { WithdrawLimits, WithdrawalStatus } from './types';
+import { supabaseDbService } from '../../services/supabaseDbService';
+import { useAuthContext } from '../../context/AuthProvider';
+import { uploadFileToStorage } from '../../services/supabaseClient';
+import { withdrawAmountSchema } from './validation';
 
 type WithdrawStep =
   | 'overview'
@@ -22,6 +25,7 @@ type WithdrawStep =
 
 export const Withdraw: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuthContext();
   const [step, setStep] = useState<WithdrawStep>('overview');
   const [isLoading, setIsLoading] = useState(false);
   const [limits, setLimits] = useState<WithdrawLimits | null>(null);
@@ -37,14 +41,36 @@ export const Withdraw: React.FC = () => {
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [estimatedArrival, setEstimatedArrival] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
 
   // Fetch withdraw limits on mount
   useEffect(() => {
     const fetchLimits = async () => {
       try {
         setIsLoading(true);
-        const data = await withdrawService.getWithdrawLimits();
-        setLimits(data);
+        if (!user?.id) {
+          setError('Please sign in to continue');
+          return;
+        }
+        const account = await supabaseDbService.getAccountByUser(user.id);
+        if (!account) {
+          setError('Account not found');
+          return;
+        }
+        const transactions = await supabaseDbService.getTransactions(user.id, 500);
+        const balance = transactions
+          .filter((t) => t.account_id === account.id)
+          .reduce((sum, t) => sum + (t.type === 'credit' ? Number(t.amount) : -Number(t.amount)), 0);
+        const today = new Date().toDateString();
+        const dailyWithdrawn = transactions
+          .filter((t) => t.type === 'debit' && t.created_at && new Date(t.created_at).toDateString() === today)
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+        setLimits({
+          availableBalance: balance,
+          withdrawableBalance: balance,
+          dailyLimit: 10000,
+          dailyWithdrawn,
+        });
       } catch (err) {
         setError('Failed to load account limits');
       } finally {
@@ -65,15 +91,19 @@ export const Withdraw: React.FC = () => {
       setIsLoading(true);
       setError(null);
 
-      // Validate the withdrawal
-      const validation = await withdrawService.validateWithdraw({
-        amount: data.amount,
-        method: data.method,
-      });
+      const parsed = withdrawAmountSchema.safeParse(data);
+      if (!parsed.success) {
+        setError(parsed.error.issues[0]?.message || 'Validation failed');
+        return;
+      }
+      if (limits && data.amount > limits.withdrawableBalance) {
+        setError('Amount exceeds available balance');
+        return;
+      }
 
       setAmount(data.amount);
       setSelectedMethod(data.method);
-      setFee(validation.fee);
+      setFee(0);
 
       // Proceed to next step
       if (data.method === 'external-bank') {
@@ -101,16 +131,65 @@ export const Withdraw: React.FC = () => {
       setError(null);
       setStep('status');
 
-      // Initiate the withdrawal
-      const response = await withdrawService.initiateWithdraw({
+      if (!user?.id) {
+        setStatus('failed');
+        setError('Please sign in to continue');
+        return;
+      }
+      const account = await supabaseDbService.getAccountByUser(user.id);
+      if (!account) {
+        setStatus('failed');
+        setError('Account not found');
+        return;
+      }
+
+      let evidenceUrl: string | null = null;
+      if (evidenceFile) {
+        const path = `${user.id}/withdrawals/${Date.now()}-${evidenceFile.name}`;
+        evidenceUrl = await uploadFileToStorage('payment-evidence', path, evidenceFile);
+      }
+
+      const tx = await supabaseDbService.createTransaction({
+        user_id: user.id,
+        account_id: account.id,
+        type: 'debit',
         amount,
-        method: selectedMethod,
-        bankDetails: selectedMethod === 'external-bank' && bankDetails ? bankDetails : undefined,
+        description: `Withdrawal (${selectedMethod})`,
+        currency: account.currency,
+        status: 'pending',
+        metadata: {
+          evidence_url: evidenceUrl,
+          evidence_name: evidenceFile?.name || null,
+          evidence_type: evidenceFile?.type || null,
+          method: selectedMethod,
+          bank_details: selectedMethod === 'external-bank' ? bankDetails : null,
+        },
       });
 
-      setTransactionId(response.transactionId);
-      setStatus(response.status);
-      setEstimatedArrival(response.estimatedArrival);
+      if (!tx?.id) {
+        setStatus('failed');
+        setError('Failed to create withdrawal');
+        return;
+      }
+
+      await supabaseDbService.createActivity({
+        user_id: user.id,
+        type: 'withdrawal',
+        description: 'Withdrawal request submitted',
+        amount,
+      });
+      await supabaseDbService.createNotification({
+        user_id: user.id,
+        title: 'Withdrawal Pending',
+        message: 'Your withdrawal request has been received and is pending review.',
+        type: 'pending',
+        read: false,
+        path: '/activity',
+      });
+
+      setTransactionId(tx.id);
+      setStatus('pending');
+      setEstimatedArrival(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString());
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to process withdrawal'
@@ -133,7 +212,7 @@ export const Withdraw: React.FC = () => {
         setStep(selectedMethod === 'external-bank' ? 'bank-details' : 'amount');
         break;
       default:
-        navigate('/dashboard/account');
+        navigate('/dashboard');
     }
   };
 
@@ -294,6 +373,8 @@ export const Withdraw: React.FC = () => {
                 onConfirm={handleReviewConfirm}
                 onBack={handleBackClick}
                 isLoading={isLoading}
+                evidenceFile={evidenceFile}
+                onEvidenceChange={setEvidenceFile}
               />
             </motion.div>
           )}

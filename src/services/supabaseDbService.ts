@@ -59,6 +59,7 @@ export interface Transaction {
   description: string;
   currency: string;
   status: 'completed' | 'pending' | 'failed';
+  metadata?: Record<string, any>;
   created_at?: string;
 }
 

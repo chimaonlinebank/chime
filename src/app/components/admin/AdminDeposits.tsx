@@ -20,6 +20,7 @@ interface DepositRow {
   status: string;
   created: string;
   reference: string;
+  evidenceUrl?: string | null;
 }
 
 export default function AdminDeposits() {
@@ -56,11 +57,12 @@ export default function AdminDeposits() {
           const userName = profile?.name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'User';
           const currency = tx.currency || profile?.currency || account?.currency || 'USD';
           const amountValue = Number(tx.amount || 0);
-          const method = (tx.description || '').toLowerCase().includes('paypal')
+          const metadataMethod = tx.metadata?.method;
+          const method = metadataMethod ?? ((tx.description || '').toLowerCase().includes('paypal')
             ? 'PayPal'
             : (tx.description || '').toLowerCase().includes('gift')
             ? 'Gift Card'
-            : 'Bank Transfer';
+            : 'Bank Transfer');
 
           return {
             id: tx.id,
@@ -75,6 +77,7 @@ export default function AdminDeposits() {
             status: tx.status,
             created: tx.created_at ? new Date(tx.created_at).toLocaleDateString() : 'N/A',
             reference: tx.id,
+            evidenceUrl: tx.metadata?.evidence_url || null,
           } as DepositRow;
         });
 
@@ -378,10 +381,28 @@ export default function AdminDeposits() {
                 <div>
                   <h3 className="text-lg font-bold mb-4">Upload Evidence</h3>
                   <div className="border-2 border-dashed border-border rounded-lg p-4 bg-gray-50/50">
-                    <div className="text-center py-8">
-                      <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No upload evidence provided</p>
-                    </div>
+                    {selected.evidenceUrl ? (
+                      <div className="space-y-2">
+                        <img
+                          src={selected.evidenceUrl}
+                          alt="Deposit evidence"
+                          className="w-full rounded-lg border border-border max-h-96 object-contain"
+                        />
+                        <a
+                          href={selected.evidenceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-muted-foreground text-center block underline"
+                        >
+                          View full evidence
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">No upload evidence provided</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -447,3 +468,5 @@ export default function AdminDeposits() {
     </AdminLayout>
   );
 }
+
+

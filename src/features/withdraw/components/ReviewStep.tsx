@@ -13,6 +13,8 @@ interface ReviewStepProps {
   onConfirm: () => void;
   onBack: () => void;
   isLoading: boolean;
+  evidenceFile: File | null;
+  onEvidenceChange: (file: File | null) => void;
 }
 
 const methodLabels: Record<WithdrawalMethod, string> = {
@@ -35,6 +37,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
   onConfirm,
   onBack,
   isLoading,
+  evidenceFile,
+  onEvidenceChange,
 }) => {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
@@ -140,6 +144,27 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
           am the account holder.
         </label>
       </div>
+
+      {/* Evidence Upload (Optional) */}
+      <motion.div
+        whileHover={{ y: -2 }}
+        className="bg-white border border-gray-200 rounded-lg p-4"
+      >
+        <p className="text-sm font-semibold text-charcoal-900 mb-2">Upload Evidence (Optional)</p>
+        <p className="text-xs text-charcoal-600 mb-3">
+          If you have a receipt or transfer proof, upload it here for faster processing.
+        </p>
+        <input
+          type="file"
+          accept="image/*,application/pdf"
+          onChange={(e) => onEvidenceChange(e.target.files?.[0] || null)}
+          className="block w-full text-sm"
+          title="Upload withdrawal evidence"
+        />
+        {evidenceFile && (
+          <p className="mt-2 text-xs text-charcoal-700">Selected: {evidenceFile.name}</p>
+        )}
+      </motion.div>
 
       {/* Security Notice */}
       <motion.div

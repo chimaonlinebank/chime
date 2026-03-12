@@ -125,7 +125,7 @@
 ./.env.production
 VITE_API_URL=https://api.chime.com
 VITE_APP_NAME=chime
-VITE_SITE_URL=https://your-vercel-domain.vercel.app
+VITE_SITE_URL=https://chime-14c5kfm4w-chimaonlinebank-7988s-projects.vercel.app
 VITE_VERCEL_PROJECT_ID=prj_gRJU3Rwni95hywxzeL47ZuFTm2y2
 ```
 
@@ -187,3 +187,4 @@ npm run build
 - Monitor database query performance
 - Track API response times
 - Monitor user registration and login flows
+

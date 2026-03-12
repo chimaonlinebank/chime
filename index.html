@@ -72,5 +72,18 @@
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function () {
+        const splash = document.getElementById('pwa-splash');
+        if (!splash) return;
+        const removeSplash = () => {
+          splash.style.opacity = '0';
+          splash.style.transition = 'opacity 250ms ease';
+          setTimeout(() => splash.remove(), 300);
+        };
+        window.addEventListener('load', removeSplash);
+        setTimeout(removeSplash, 4000);
+      })();
+    </script>
   </body>
 </html>

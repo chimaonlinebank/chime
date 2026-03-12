@@ -10,6 +10,7 @@ import AccountCreationPrompt from './AccountCreationPrompt';
 import AccountCreationModal from './AccountCreationModal';
 import { useAuthContext } from '../../../context/AuthProvider';
 import { supabaseDbService } from '../../../services/supabaseDbService';
+import { uploadFileToStorage } from '../../../services/supabaseClient';
 
 const addMethods = [
   { key: 'bank', label: 'Bank Transfer' },
@@ -131,6 +132,13 @@ export default function AddMoney() {
       setError('Account not found. Please create your account first.');
       return;
     }
+    let evidenceUrl: string | null = null;
+    try {
+      const path = `${user.id}/add-money/${Date.now()}-${proofFile.name}`;
+      evidenceUrl = await uploadFileToStorage('payment-evidence', path, proofFile);
+    } catch {
+      evidenceUrl = null;
+    }
     const amountValue = parseFloat(amount);
     const pendingTx = await supabaseDbService.createTransaction({
       user_id: user.id,
@@ -140,6 +148,12 @@ export default function AddMoney() {
       description: `Add money via ${method || 'transfer'}`,
       currency: account.currency,
       status: 'pending',
+      metadata: {
+        evidence_url: evidenceUrl,
+        evidence_name: proofFile.name,
+        evidence_type: proofFile.type,
+        method: method || 'transfer',
+      },
     });
     if (pendingTx?.id) {
       setPendingTransactionId(pendingTx.id);
