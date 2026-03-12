@@ -18,7 +18,7 @@ function getEnv(): RequiredEnv {
 
   const vars: RequiredEnv = {
     VITE_API_URL: env.VITE_API_URL || fallbackApiUrl,
-    VITE_APP_NAME: env.VITE_APP_NAME,
+    VITE_APP_NAME: env.VITE_APP_NAME || 'chime',
     VITE_FEATURE_FLAGS: env.VITE_FEATURE_FLAGS,
     VITE_LOG_LEVEL: env.VITE_LOG_LEVEL || 'warn',
     VITE_IS_PRODUCTION: env.VITE_IS_PRODUCTION || env.MODE === 'production',
@@ -26,12 +26,8 @@ function getEnv(): RequiredEnv {
     VITE_VERCEL_PROJECT_ID: env.VITE_VERCEL_PROJECT_ID,
   };
 
-  // Validate required
   if (!vars.VITE_API_URL) {
     throw new Error('Missing required env variable: VITE_API_URL');
-  }
-  if (!vars.VITE_APP_NAME) {
-    throw new Error('Missing required env variable: VITE_APP_NAME');
   }
 
   return vars;
