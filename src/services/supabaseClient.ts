@@ -4,7 +4,9 @@ let supabase: SupabaseClient | null = null;
 
 export function initSupabase() {
   const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const key =
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
   if (!url || !key) return null;
   if (!supabase) supabase = createClient(url as string, key as string, { realtime: { params: { eventsPerSecond: 10 } } });
   return supabase;

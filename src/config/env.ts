@@ -12,8 +12,10 @@ function getEnv(): RequiredEnv {
   // Vite exposes env via import.meta.env
   const env = (import.meta as any).env;
 
+  const fallbackApiUrl = env.VITE_SITE_URL ? ${env.VITE_SITE_URL}/api : (typeof window !== 'undefined' ? ${window.location.origin}/api : '');
+
   const vars: RequiredEnv = {
-    VITE_API_URL: env.VITE_API_URL,
+    VITE_API_URL: env.VITE_API_URL || fallbackApiUrl,
     VITE_APP_NAME: env.VITE_APP_NAME,
     VITE_FEATURE_FLAGS: env.VITE_FEATURE_FLAGS,
     VITE_LOG_LEVEL: env.VITE_LOG_LEVEL || 'warn',
@@ -43,3 +45,5 @@ if (ENV.VITE_IS_PRODUCTION && ENV.VITE_LOG_LEVEL === 'error') {
 }
 
 export default ENV;
+
+
